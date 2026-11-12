@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.3 · 2026-11-12 · 系列蓝标图标
+
+### 发布物
+- 新增 `icons/icon_small.png`（128×128）与 `icons/icon_large.png`（512×512），采用 Skill 系列蓝图风蓝标（深蓝底 #0A1F3C + 青蓝线 #4AD3FF + 网格底纹），图元为用地红线、建筑轮廓、塔吊与场内道路。
+- `agents/openai.yaml` 增加 `interface.icon_small/icon_large` 引用，供 Codex/ClawHub 读取；SkillHub 图标经平台图标接口上传。
+- 功能、规则库、契约与出图口径与 0.7.2 完全一致，无代码改动。
+
 ## 0.7.2 · 2026-11-12 · 识图链路收口
 
 ### 出图链路

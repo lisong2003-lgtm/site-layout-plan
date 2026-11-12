@@ -2,7 +2,7 @@
 name: site-layout-plan
 slug: site-layout-plan
 displayName: 施工平面布置图
-version: 0.7.2
+version: 0.7.3
 platforms: [macos, windows, linux]
 author: lis
 license: CC-BY-NC-SA-4.0
@@ -12,7 +12,7 @@ locale: zh-CN
 
 # 施工平面布置图
 
-本技能 0.7.2 从**施工单位经验丰富的项目总工**视角，把 reader 的场地证据变成可讨论、可校核、可分阶段出图的平面布置草案：
+本技能 0.7.3 从**施工单位经验丰富的项目总工**视角，把 reader 的场地证据变成可讨论、可校核、可分阶段出图的平面布置草案：
 
 1. 消费 reader 的 `*.site.json`、`*.crane.json`、`site-handoff/v1`、`cad-contract/v1`，单位确认后归一为 mm 底图。
 2. 在红线、主体轮廓、道路骨架和周边条件内，自动给出 **A 紧凑 / B 均衡 / C 安全文明** 三套候选布置，逐套跑规则、道路和周边校核。
