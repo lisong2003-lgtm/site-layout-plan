@@ -24,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from . import __version__
 from .model import SiteLayoutError, UnitError, normalize_unit
 
 BASE_MAP_SCHEMA = "site-layout-base-map/v1"
@@ -964,7 +965,7 @@ def prepare(
             "confirmed_by": decision.confirmed_by,
         },
         "prepared_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-        "prepared_by": "site-layout-plan/0.7.0",
+        "prepared_by": f"site-layout-plan/{__version__}",
         "redline": redline_vertices,
         "redline_closed": redline_closed,
         "redline_gap_mm": redline_gap,

@@ -150,7 +150,7 @@ class StageDrawCliTest(unittest.TestCase):
             self.assertIn("SLP_HYDRANT", blocks)
             self.assertTrue(any(name.startswith("SLP_") for name in blocks))
             title = json.loads((self.out / "titleblock-{}.json".format(stage)).read_text(encoding="utf-8"))
-            self.assertEqual(title["version"], "0.7.1")
+            self.assertEqual(title["version"], "0.7.2")
             self.assertIn("DRAFT", title["draft"])
             selfcheck = json.loads((self.out / "selfcheck-{}.json".format(stage)).read_text(encoding="utf-8"))
             self.assertEqual(len(selfcheck["items"]), 12)

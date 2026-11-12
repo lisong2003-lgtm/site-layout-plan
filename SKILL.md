@@ -2,7 +2,7 @@
 name: site-layout-plan
 slug: site-layout-plan
 displayName: 施工平面布置图
-version: 0.7.1
+version: 0.7.2
 platforms: [macos, windows, linux]
 author: lis
 license: CC-BY-NC-SA-4.0
@@ -12,7 +12,7 @@ locale: zh-CN
 
 # 施工平面布置图
 
-本技能 0.7.0 从**施工单位经验丰富的项目总工**视角，把 reader 的场地证据变成可讨论、可校核、可分阶段出图的平面布置草案：
+本技能 0.7.2 从**施工单位经验丰富的项目总工**视角，把 reader 的场地证据变成可讨论、可校核、可分阶段出图的平面布置草案：
 
 1. 消费 reader 的 `*.site.json`、`*.crane.json`、`site-handoff/v1`、`cad-contract/v1`，单位确认后归一为 mm 底图。
 2. 在红线、主体轮廓、道路骨架和周边条件内，自动给出 **A 紧凑 / B 均衡 / C 安全文明** 三套候选布置，逐套跑规则、道路和周边校核。
@@ -33,7 +33,7 @@ DWG/DXF/PDF
 ```
 
 - 本技能**不打开、不解析** DWG/DXF/PDF，不 import `ezdwg`/`ezdxf`/`read_cad` 解图，也不自带或重下 reader。
-- `prepare_site.py` 读取前先拒绝 `.dwg/.dxf/.pdf`；只收 `schema=cad-site-geometry/v1` 且 `contract.contract_version=cad-contract/v1` 的 JSON，否则 exit 2。
+- `prepare_site.py`、`draw_layout.py` 读取前先拒绝 `.dwg/.dxf/.pdf`；只收 `schema=cad-site-geometry/v1` 且 `contract.contract_version=cad-contract/v1` 的 JSON（出图也接受 `prepare_site.py` 从该契约派生的 `base-map.json`），否则 exit 2。
 - `crane_check.py` 只收 `site-handoff/v1` 且带 `contract_id/source_sha256` 的 reader 契约，直读 CAD 同样 exit 2。
 - bus 或 reader 缺失时如实标 `unavailable` 并停止，不提供第二套识图路径，也没有 `CAD_ALLOW_DIRECT` 逃生口。
 
@@ -88,7 +88,7 @@ python3 scripts/render_facility_showcase.py --out out/facility-showcase.png
 
 ## 本版能做什么
 
-A/B/C 三套候选、真实红线/主体、三阶段（土石方/主体/装饰）建模校核出图、26 条临建规则、道路 R1~R4、周边硬软约束、六视角审查、7 类设施标准块与办公区/员工宿舍区/工人生活区分类、自绘参数化标准块（DXF BLOCK 与 PNG 同源）、DXF/PNG 图签与 `DRAFT` 留痕、R12「看图版」导出、单位与同源闸门。完整能力清单见 `references/capabilities.md`。
+A/B/C 三套候选、真实红线/主体、三阶段建模校核出图、26 条临建规则、道路 R1~R4、周边硬软约束、六视角审查、7 类自绘标准块（DXF BLOCK 与 PNG 同源）、图签与 `DRAFT` 留痕、R12 看图版、单位与同源闸门。完整清单见 `references/capabilities.md`。
 
 ## CAD快速看图兼容（R12 看图版）
 

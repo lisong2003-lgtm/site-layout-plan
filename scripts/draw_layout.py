@@ -2,7 +2,7 @@
 """施工平面布置图派生出图 CLI（DXF/PNG/图签/自检）。
 
 用法：
-  python3 scripts/draw_layout.py --site site_sample.dxf \
+  python3 scripts/draw_layout.py --site 总图.site.json \
       --handoff site_handoff.json --check crane_check.json \
       --baseline baseline.json --out-dir out/layout [--layout layout.json] [--draft]
 
@@ -33,7 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="draw_layout",
         description="把场地底图、塔吊布置与吊装校核画成派生 DXF/PNG，并出图签与自检；原图只读。",
     )
-    parser.add_argument("--site", required=True, help="reader 的 *.site.json 或带单位的 .dxf（只读）")
+    parser.add_argument("--site", required=True, help="cad-file-reader 的 cad-site-geometry/v1 JSON（或 prepare_site 派生的 base-map.json）；不直读 CAD/PDF")
     parser.add_argument("--handoff", required=True, help="site_handoff.json（site-handoff/v1）")
     parser.add_argument("--check", required=True, help="crane_check.json（crane-check/v1）")
     parser.add_argument("--baseline", required=True, help="baseline.json（口径锁）")

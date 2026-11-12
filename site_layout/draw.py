@@ -1,4 +1,4 @@
-"""site-layout-plan 0.7.0 · 派生 DXF/PNG 出图、图签与自检。
+"""site-layout-plan 0.7.2 · 派生 DXF/PNG 出图、图签与自检。
 
 硬边界：
 - 只读输入原图，永不写回；输出目录不得等于原图目录。
@@ -24,10 +24,13 @@ try:  # 测试环境会先把 cad-file-reader/vendor 放进 sys.path
 except ImportError as exc:  # pragma: no cover - CLI 会先 bootstrap
     raise ImportError("缺少 ezdxf；请安装 ezdxf>=1.4 或设置 SITE_LAYOUT_VENDOR") from exc
 
+from . import __version__
 from .model import BaselineError, SiteLayoutError, UnitError, load_baseline, load_handoff, normalize_unit
+from .prepare import validate_reader_contract, validate_reader_path
 
-VERSION = "0.7.0"
+VERSION = __version__
 SCHEMA = "layout-selfcheck/v1"
+BASE_MAP_SCHEMA = "site-layout-base-map/v1"
 TITLEBLOCK_SCHEMA = "layout-titleblock/v1"
 LAYOUT_SCHEMA = "layout-result/v1"
 DEFAULT_TITLEBLOCK = Path(__file__).resolve().parent.parent / "templates" / "titleblock.json"
@@ -133,23 +136,6 @@ def _unit_factor(unit: str) -> Tuple[str, float]:
     raise UnitError("出图只接受 mm 或 m 源坐标；请先换算为 mm 后再出图")
 
 
-def _dxf_unit(doc: Any) -> Tuple[str, float]:
-    code = doc.header.get("$INSUNITS", 0)
-    try:
-        code = int(code)
-    except (TypeError, ValueError):
-        code = 0
-    if code == 4:
-        return "mm", 1.0
-    if code == 6:
-        return "m", 1000.0
-    if code == 5:
-        raise UnitError("DXF $INSUNITS=5（cm）；出图只接受 mm 或 m，请先换算")
-    if code in (1, 2, 3):
-        raise UnitError(f"DXF $INSUNITS={code}（英制）；出图只接受 mm 或 m，请先换算")
-    raise UnitError("DXF 未声明 $INSUNITS（mm/m），不能保证出图单位一致")
-
-
 def _layer_matches(layer: str, keywords: Sequence[str]) -> bool:
     text = (layer or "").upper()
     return any(keyword.upper() in text for keyword in keywords)
@@ -190,22 +176,6 @@ def _entity_points(entity: Any, factor: float) -> List[Tuple[float, float]]:
     except Exception:
         return []
     return points
-
-
-def _entity_segments(entity: Any, factor: float) -> List[Tuple[float, float, float, float]]:
-    kind = entity.dxftype()
-    points = _entity_points(entity, factor)
-    if kind == "LINE" and len(points) >= 2:
-        return [(points[0][0], points[0][1], points[1][0], points[1][1])]
-    if kind in ("LWPOLYLINE", "POLYLINE") and len(points) >= 2:
-        segments: List[Tuple[float, float, float, float]] = []
-        for left, right in zip(points, points[1:]):
-            segments.append((left[0], left[1], right[0], right[1]))
-        closed = bool(getattr(entity, "closed", False)) or bool(getattr(entity.dxf, "flags", 0) & 1)
-        if closed and points[0] != points[-1]:
-            segments.append((points[-1][0], points[-1][1], points[0][0], points[0][1]))
-        return segments
-    return []
 
 
 def _bbox_points(points: Iterable[Tuple[float, float]]) -> Optional[Tuple[float, float, float, float]]:
@@ -277,102 +247,6 @@ def _assemble_loop(
     return points, closed, gap
 
 
-def _polyline_points(entity: Any, factor: float) -> List[Tuple[float, float]]:
-    return _entity_points(entity, factor)
-
-
-def _load_site_dxf(path: Path) -> SiteData:
-    try:
-        doc = ezdxf.readfile(str(path))
-    except Exception as exc:
-        raise SiteLayoutError(f"无法读取场地 DXF：{path}：{exc}") from exc
-    source_units, factor = _dxf_unit(doc)
-    msp = doc.modelspace()
-    base_entities: List[Any] = []
-    base_segments: List[Tuple[float, float, float, float]] = []
-    extents: Optional[Tuple[float, float, float, float]] = None
-    redline_segments: List[Tuple[float, float, float, float]] = []
-    redline_polygons: List[Tuple[List[Tuple[float, float]], bool, Optional[float]]] = []
-    fence_segments: List[Tuple[float, float, float, float]] = []
-    fence_polygons: List[Tuple[List[Tuple[float, float]], bool, Optional[float]]] = []
-    for entity in msp:
-        layer = _safe_text(getattr(entity.dxf, "layer", ""))
-        base_entities.append(entity)
-        extents = _merge_bbox(extents, _bbox_points(_entity_points(entity, factor)))
-        segments = _entity_segments(entity, factor)
-        base_segments.extend(segments)
-        if _layer_matches(layer, REDLINE_KEYWORDS):
-            redline_segments.extend(segments)
-            if entity.dxftype() in ("LWPOLYLINE", "POLYLINE"):
-                points = _polyline_points(entity, factor)
-                closed = bool(getattr(entity, "closed", False)) or bool(getattr(entity.dxf, "flags", 0) & 1)
-                gap = _distance(points[0], points[-1]) if len(points) >= 2 else None
-                is_closed = closed or (gap is not None and gap <= 50.0)
-                redline_polygons.append((points, is_closed, 0.0 if is_closed else gap))
-        if _layer_matches(layer, FENCE_KEYWORDS):
-            fence_segments.extend(segments)
-            if entity.dxftype() in ("LWPOLYLINE", "POLYLINE"):
-                points = _polyline_points(entity, factor)
-                closed = bool(getattr(entity, "closed", False)) or bool(getattr(entity.dxf, "flags", 0) & 1)
-                gap = _distance(points[0], points[-1]) if len(points) >= 2 else None
-                is_closed = closed or (gap is not None and gap <= 50.0)
-                fence_polygons.append((points, is_closed, 0.0 if is_closed else gap))
-
-    contract_id = ""
-    contract_source = "missing"
-    for tag in ("CONTRACT_ID", "SITE_CONTRACT_ID", "PROJECT_CONTRACT_ID"):
-        value = doc.header.custom_vars.get(tag)
-        if value:
-            contract_id = _safe_text(value)
-            contract_source = "dxf_header:" + tag
-            break
-    if not contract_id:
-        companion = path.with_suffix(".site.json")
-        if companion.is_file():
-            try:
-                payload = json.loads(companion.read_text(encoding="utf-8"))
-                contract_id = _safe_text(payload.get("contract_id") or (payload.get("contract") or {}).get("contract_id"))
-                contract_source = "companion:" + companion.name if contract_id else "missing"
-            except (OSError, json.JSONDecodeError, AttributeError):
-                pass
-
-    redline_vertices: List[Tuple[float, float]] = []
-    redline_closed = False
-    redline_gap: Optional[float] = None
-    if redline_polygons:
-        redline_polygons.sort(key=lambda item: _polyline_area(item[0]), reverse=True)
-        redline_vertices, redline_closed, redline_gap = redline_polygons[0]
-    elif redline_segments:
-        redline_vertices, redline_closed, redline_gap = _assemble_loop(redline_segments, 50.0)
-
-    fence_vertices: List[Tuple[float, float]] = []
-    if fence_polygons:
-        fence_polygons.sort(key=lambda item: _polyline_area(item[0]), reverse=True)
-        fence_vertices = fence_polygons[0][0]
-    elif fence_segments:
-        fence_vertices, _closed, _gap = _assemble_loop(fence_segments, 50.0)
-
-    return SiteData(
-        source_path=path,
-        source_kind="dxf",
-        source_sha256=_sha256(path),
-        source_units=source_units,
-        mm_per_unit=factor,
-        contract_id=contract_id,
-        contract_id_source=contract_source,
-        contract_source_sha256=_sha256(path),
-        base_entities=base_entities,
-        base_segments=base_segments,
-        redline_vertices=redline_vertices,
-        redline_segments=redline_segments,
-        redline_closed=redline_closed,
-        redline_gap_mm=redline_gap,
-        fence_vertices=fence_vertices,
-        fence_segments=fence_segments,
-        extents=extents,
-    )
-
-
 def _json_declared_unit(data: Dict[str, Any]) -> Optional[str]:
     for key in ("coord_unit", "units", "unit", "drawing_unit"):
         value = data.get(key)
@@ -403,6 +277,17 @@ def _load_site_json(path: Path) -> SiteData:
         raise SiteLayoutError(f"无法读取场地 JSON：{path}：{exc}") from exc
     if not isinstance(data, dict):
         raise SiteLayoutError("场地 JSON 顶层必须是对象")
+    # 0.7.2 硬闸门：只接受 cad-file-reader 的 cad-site-geometry/v1，
+    # 或 prepare_site 从该契约派生的 base-map；普通 JSON、手写底图一律拒绝。
+    if _safe_text(data.get("schema")) == BASE_MAP_SCHEMA:
+        validate_reader_path(path)
+        if _safe_text(data.get("source_schema")) != "cad-site-geometry/v1":
+            raise SiteLayoutError(
+                "base-map 缺少 reader 来源：source_schema 必须是 cad-site-geometry/v1；"
+                "请先走 lis-skill-bus → cad-file-reader → prepare_site.py"
+            )
+    else:
+        validate_reader_contract(path, data)
     unit_text = _json_declared_unit(data)
     if not unit_text:
         raise UnitError("场地 JSON 未声明单位（coord_unit/units/drawing_unit），不能出图")
@@ -479,12 +364,15 @@ def load_site(path_value: str) -> SiteData:
     path = Path(path_value).expanduser()
     if not path.is_file():
         raise SiteLayoutError(f"找不到场地文件：{path}")
-    suffix = path.suffix.lower()
-    if suffix == ".dxf":
-        return _load_site_dxf(path)
-    if suffix == ".json":
-        return _load_site_json(path)
-    raise SiteLayoutError("--site 只接受 .dxf 或 reader 生成的 .json")
+    # 0.7.2 硬闸门：出图也不得直读 CAD/PDF。识图只能走
+    # DWG/DXF/PDF → lis-skill-bus → cad-file-reader → cad-contract/v1 → 本技能。
+    validate_reader_path(path)
+    if path.suffix.lower() != ".json":
+        raise SiteLayoutError(
+            "--site 只接受 cad-file-reader 的 cad-site-geometry/v1 JSON"
+            "（或 prepare_site.py 从该契约派生的 base-map.json）；不直读 CAD/PDF"
+        )
+    return _load_site_json(path)
 
 
 def _default_layout_path(site_path: Path) -> Optional[Path]:

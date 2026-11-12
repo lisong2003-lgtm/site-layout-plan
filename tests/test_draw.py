@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""site-layout-plan 0.6.7 · 出图/图签/自检回归测试。
+"""site-layout-plan 0.7.2 · 出图/图签/自检与识图闸门回归测试。
 
 系统 python3 缺 ezdxf/Pillow 时，bootstrap 会自动切到 Codex 本地 Python 3.12。
 """
@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,6 +17,9 @@ ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 DRAW_CLI = ROOT / "scripts" / "draw_layout.py"
 CHECK_CLI = ROOT / "scripts" / "crane_check.py"
+
+
+SITE_SAMPLE = FIXTURES / "reader_site_mm.json"
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -83,7 +85,7 @@ def run_draw(
         sys.executable,
         str(DRAW_CLI),
         "--site",
-        str(FIXTURES / "site_sample.dxf"),
+        str(SITE_SAMPLE),
         "--handoff",
         str(FIXTURES / "handoff_p4.json"),
         "--check",
@@ -93,8 +95,7 @@ def run_draw(
         "--out-dir",
         str(out_dir),
     ]
-    if layout is not None:
-        command.extend(["--layout", str(layout)])
+    command.extend(["--layout", str(layout if layout is not None else FIXTURES / "site_sample.layout.json")])
     if draft:
         command.append("--draft")
     return subprocess.run(command, cwd=str(ROOT), capture_output=True, text=True)
@@ -107,7 +108,7 @@ class DrawLayoutTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory(prefix="site_draw_test_")
         self.base = Path(self.tmp.name)
         self.check = run_check(self.base / "check")
-        self.source = FIXTURES / "site_sample.dxf"
+        self.source = SITE_SAMPLE
         self.source_sha = sha256(self.source)
 
     def tearDown(self) -> None:
@@ -168,14 +169,14 @@ class DrawLayoutTest(unittest.TestCase):
         out = self.base / "out_hash"
         proc = run_draw(out, check=self.check, draft=True)
         self.assertEqual(proc.returncode, 0, msg=proc.stderr)
-        self.assertEqual(sha256(self.source), self.source_sha, "原 DXF 字节被改动")
+        self.assertEqual(sha256(self.source), self.source_sha, "reader 契约字节被改动")
         title = json.loads((out / "titleblock.json").read_text(encoding="utf-8"))
         self.assertEqual(title["source_sha256_before"], self.source_sha)
         self.assertEqual(title["source_sha256_after"], self.source_sha)
         self.assertTrue(title["source_unchanged"])
         self.assertEqual(title["draft_label"], "DRAFT")
         self.assertFalse(title["final_check"])
-        print("  [3/5] 原图 SHA 前后一致：{}".format(self.source_sha[:16] + "…"))
+        print("  [3/5] reader 契约 SHA 前后一致：{}".format(self.source_sha[:16] + "…"))
 
     def test_04_contract_missing_draft(self) -> None:
         layout = self.base / "site_sample.layout.json"
@@ -199,7 +200,7 @@ class DrawLayoutTest(unittest.TestCase):
     def test_06_reader_crane_json_accepted(self) -> None:
         from site_layout.draw import load_layout
 
-        site = self.base / "site_sample.dxf"
+        site = SITE_SAMPLE
         cranes, path, contract_id = load_layout(str(FIXTURES / "reader_crane.json"), site, {})
         self.assertEqual(len(cranes), 1)
         crane = cranes[0]
@@ -219,6 +220,37 @@ class DrawLayoutTest(unittest.TestCase):
         self.assertEqual(len(site.redline_vertices), 4)
         self.assertTrue(site.redline_closed)
         print("  [7/7] 顶层无 coord_unit 时回退 scale_unit_audit[].units=mm")
+
+    def test_08_draw_rejects_direct_cad(self) -> None:
+        """出图也不得直读 CAD/PDF，必须走 bus -> reader。"""
+        out = self.base / "out_direct_cad"
+        direct_cad = self.base / "direct.dxf"
+        direct_cad.write_text("0\nSECTION\n2\nHEADER\n0\nENDSEC\n0\nEOF\n", encoding="ascii")
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(DRAW_CLI),
+                "--site",
+                str(direct_cad),
+                "--handoff",
+                str(FIXTURES / "handoff_p4.json"),
+                "--check",
+                str(self.check),
+                "--baseline",
+                str(FIXTURES / "baseline.json"),
+                "--out-dir",
+                str(out),
+                "--draft",
+            ],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 2, msg=f"stdout={proc.stdout}\nstderr={proc.stderr}")
+        self.assertIn("cad-file-reader", proc.stderr)
+        self.assertIn("lis-skill-bus", proc.stderr)
+        self.assertFalse((out / "layout.dxf").exists(), "直读 CAD 不得生成图")
+        print("  [8/8] draw_layout 直读 DXF：exit 2，提示必须走 bus -> reader")
 
     def test_05_baseline_unlocked_exit5(self) -> None:
         out = self.base / "out_unlocked"

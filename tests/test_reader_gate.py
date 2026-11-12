@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""0.7.1 · 识图硬链路闸门：只收 lis-skill-bus → cad-file-reader 契约。"""
+"""0.7.2 · 识图硬链路闸门：只收 lis-skill-bus → cad-file-reader 契约。"""
 from __future__ import annotations
 
 import json

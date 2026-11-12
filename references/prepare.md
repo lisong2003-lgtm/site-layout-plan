@@ -1,6 +1,6 @@
 # reader 契约与单位适配
 
-> 本文件由 SKILL.md 按需加载；内容与 0.7.1 代码同步。
+> 本文件由 SKILL.md 按需加载；内容与 0.7.2 代码同步。
 
 reader 只出**证据**：单位可能在 `scale_unit_audit[].units`，也可能在逐条几何的 `unit`；顶层不一定有 `coord_unit`。图纸没写单位时 reader 如实标 `missing_unit`，不会替项目拍板。出图必须按 mm 落笔，所以中间必须有一层把「候选单位」变成「施工口径」并留痕——这就是 `prepare_site.py`。它不重新识图、不判定合规，只做：
 

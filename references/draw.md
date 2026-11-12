@@ -1,13 +1,13 @@
 # 单阶段塔吊出图与设施图块
 
-> 本文件由 SKILL.md 按需加载；内容与 0.7.1 代码同步。
+> 本文件由 SKILL.md 按需加载；内容与 0.7.2 代码同步。
 > 本文件覆盖 `draw_layout.py` 的单阶段塔吊逐柱出图（8 条自检），以及 `render_facility_showcase.py` 的 7 类设施合并/分张大样。三阶段布置图的真 `DIMENSION`、坐标 CSV/图内表、指北针、统一文字排版与 12 条自检见 `references/site-plan.md` 的“出图内容（0.6.7）”。
 
 ## 1. 单阶段塔吊出图
 
 ### 出图输入
 
-- `--site`：优先 `prepare_site.py` 产出的 `base-map.json`（固定 mm）；也可直接给 `.dxf`（必须声明 `$INSUNITS=4` mm 或 `6` m）或 reader 的 `*.site.json`（必须声明 `mm`/`m`，且 `scale_unit_audit[]` 只能有唯一单位）。
+- `--site`：只收 `cad-file-reader` 的 `cad-site-geometry/v1`（`contract.contract_version=cad-contract/v1`），或 `prepare_site.py` 从该契约派生的 `base-map.json`（固定 mm，且 `source_schema` 必须回指 reader）。不直读 `.dwg/.dxf/.pdf`；直读 CAD exit 2。
 - `--handoff`、`--check`、`--baseline`：同校核三件套。
 - `--layout`：塔吊布置 JSON；不传时默认找与 site 同名的 `*.layout.json`。示例：
 
@@ -24,7 +24,7 @@
 ```bash
 cd site-layout-plan
 python3 scripts/draw_layout.py \
-  --site tests/fixtures/site_sample.dxf \
+  --site /tmp/reader/总图.site.json \
   --handoff tests/fixtures/handoff_p4.json \
   --check /tmp/crane_check_p4/crane_check.json \
   --baseline tests/fixtures/baseline.json \

@@ -14,7 +14,7 @@ DWG/DXF/PDF
 ```
 
 - 本技能不打开、不解析 DWG/DXF/PDF，不 import `ezdwg`/`ezdxf`/`read_cad` 解图。
-- `prepare_site.py` 只收 `cad-site-geometry/v1` 且 `contract.contract_version=cad-contract/v1` 的 reader 契约；直读 CAD 或普通 JSON 一律 exit 2。
+- `prepare_site.py`、`draw_layout.py` 只收 `cad-site-geometry/v1` 且 `contract.contract_version=cad-contract/v1` 的 reader 契约（出图也接受其派生 `base-map.json`）；直读 CAD 或普通 JSON 一律 exit 2。
 - `crane_check.py` 只收带 `contract_id/source_sha256` 的 `site-handoff/v1`。
 - 缺 `lis-skill-bus` 或 `cad-file-reader` 时标 `unavailable` 并停止，没有第二套识图路径。
 

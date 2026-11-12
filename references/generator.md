@@ -1,6 +1,6 @@
 # 自动候选布置与 A/B/C 比选
 
-本文件对应 `site_layout/generator.py` 与 `scripts/generate_site_layout.py`，内容与 0.7.1 代码同步。
+本文件对应 `site_layout/generator.py` 与 `scripts/generate_site_layout.py`，内容与 0.7.2 代码同步。
 
 ## 1. 它解决什么
 

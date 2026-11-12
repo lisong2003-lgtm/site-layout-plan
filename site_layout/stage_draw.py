@@ -28,6 +28,7 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise ImportError("缺少 ezdxf；请安装 ezdxf>=1.4 或设置 SITE_LAYOUT_VENDOR") from exc
 
+from . import __version__
 from .dimensions import (KIND_NAMES, applicable_kinds, build_coordinate_rows,
                          build_dimension_specs, select_table_rows, structure_edges)
 from .draw import _pick_font, _png_safe, finalize_doc_extents
@@ -38,7 +39,7 @@ from .symbols import (block_name, categories_in, draw_pictogram,
                       ensure_symbol_blocks, insert_symbol, symbol_size)
 from .taxonomy import FACILITIES, STAGE_NAMES, meta
 
-VERSION = "0.7.1"
+VERSION = __version__
 SELFCHECK_SCHEMA = "site-stage-selfcheck/v1"
 TITLE_SCHEMA = "site-stage-titleblock/v1"
 DIMSTYLE = "SLP-DIM"
